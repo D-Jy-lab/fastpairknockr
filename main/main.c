@@ -15,7 +15,8 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "nvs_flash.h"
-
+#include "driver/gpio.h"
+#include "rom/gpio.h"
 #include "esp_bt.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
@@ -25,7 +26,7 @@
 //#define DEBUG_DEVICES_ONLY
 
 // Delay (can be changed to however you like)
-#define DELAY_SECONDS 0.2
+//#define DELAY_SECONDS 0.1
 
 esp_ble_adv_params_t ble_params = {
     .adv_int_min        = 0x20,
@@ -242,6 +243,23 @@ const uint32_t models[] = {
     0x0703F0,  // LG HBS-1120
     0x0803F0,  // LG HBS-1125
     0x0903F0,  // LG HBS-2000
+
+    // Custom debug popups
+    0xD99CA1,  // Flipper Zero
+    0x77FF67,  // Free Robux
+    0xAA187F,  // Free VBucks
+    0xDCE9EA,  // Rickroll
+    0x87B25F,  // Animated Rickroll
+    0xF38C02,  // Boykisser
+    0x1448C9,  // BLM
+    0xD5AB33,  // Xtreme
+    0x0C0B67,  // Xtreme Cta
+    0x13B39D,  // Talking Sasquach
+    0xAA1FE1,  // ClownMaster
+    0x7C6CDB,  // Obama
+    0x005EF9,  // Ryanair
+    0xE2106F,  // FBI
+    0xB37A62,  // Tesla
 #endif
 };
 
@@ -279,9 +297,24 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_bluedroid_init());
     ESP_ERROR_CHECK(esp_bluedroid_enable());
     
+    // 初始化时设置最大功率进行发射
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P21);
+    
     ESP_LOGI(TAG, "Done. GO GO GO.\n");
+
+    // 初始化 12 和 13 引脚作为输出
+    esp_rom_gpio_pad_select_gpio(12);
+    esp_rom_gpio_pad_select_gpio(13);
+
+    gpio_set_direction(12, GPIO_MODE_OUTPUT);
+    gpio_set_direction(13, GPIO_MODE_OUTPUT);
     
     while (true) {
+        
+        // 打开指示灯
+        gpio_set_level(12, 1);
+        gpio_set_level(13, 1);
+
         for (int i = 0; i < 6; i++){
             bt_addr[i] = esp_random() % 256;
             
@@ -310,8 +343,32 @@ void app_main(void)
         ESP_ERROR_CHECK(esp_ble_gap_config_adv_data_raw(bt_packets, 14));
         ESP_LOGI(TAG, "Sending advertisement packets...");
         ESP_ERROR_CHECK(esp_ble_gap_start_advertising(&ble_params));
-        vTaskDelay((DELAY_SECONDS * 1000) / portTICK_PERIOD_MS);
+
+        // 关闭指示灯
+        gpio_set_level(12, 0);
+        gpio_set_level(13, 0);
+        
+        //vTaskDelay((DELAY_SECONDS * 1000) / portTICK_PERIOD_MS);
+        vTaskDelay(((esp_random() % 40 + 10) * 10) / portTICK_PERIOD_MS);
         ESP_ERROR_CHECK(esp_ble_gap_stop_advertising());
+
+        // 随机设置发射功率，权重由最大功率开始依次递减
+        int rand_val = esp_random() % 100;  // 生成一个0到99的随机数
+        if (rand_val < 70) {  // 70% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P21);
+        } else if (rand_val < 80) {  // 10% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P18);
+        } else if (rand_val < 90) {  // 10% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P15);
+        } else if (rand_val < 95) {  // 5% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P12);
+        } else if (rand_val < 98) {  // 3% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
+        } else if (rand_val < 99) {  // 1% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P6);
+        } else {  // 1% 的概率
+            esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_N0);
+        }
     }
 
     return;
